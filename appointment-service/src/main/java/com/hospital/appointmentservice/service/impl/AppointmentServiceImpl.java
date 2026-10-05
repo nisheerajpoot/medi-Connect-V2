@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.hospital.appointmentservice.client.HospitalClient;
 import com.hospital.appointmentservice.dto.request.AppointmentRequestDTO;
 import com.hospital.appointmentservice.dto.request.UpdateAppointmentRequestDTO;
 import com.hospital.appointmentservice.dto.response.AppointmentResponseDTO;
@@ -16,6 +17,7 @@ import com.hospital.appointmentservice.exception.ResourceNotFoundException;
 import com.hospital.appointmentservice.repository.AppointmentRepository;
 import com.hospital.appointmentservice.service.AppointmentService;
 
+import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -27,13 +29,18 @@ public class AppointmentServiceImpl implements AppointmentService {
 	// [MS-CHANGE] PatientRepository, DoctorRepository and HospitalRepository are removed.
 	//             Those tables are not in this database anymore.
 	private final AppointmentRepository appointmentRepository;
+	private final HospitalClient hospitalClient;
 
+	
 	@Override
 	public AppointmentResponseDTO createAppointment(AppointmentRequestDTO requestDTO) {
-
-		// [MS-CHANGE / TODO Phase 2] The monolith checked that the patient, doctor and hospital exist.
-		//             Now the ids are NOT validated. Later we call patient-service, doctor-service and
-		//             hospital-service (Feign) to confirm each id.
+		
+		// [MS-CHANGE / DONE Phase 2] Hospital is now validated through hospital-service using Feign.
+		try {
+		    hospitalClient.getHospitalById(requestDTO.getHospitalId());
+		} catch (FeignException.NotFound e) {
+		    throw new ResourceNotFoundException("Hospital", "id", requestDTO.getHospitalId());
+		}
 		Appointment appointment = Appointment.builder()
 				.patientId(requestDTO.getPatientId())
 				.doctorId(requestDTO.getDoctorId())
