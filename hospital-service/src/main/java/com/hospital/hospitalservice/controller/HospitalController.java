@@ -1,6 +1,7 @@
 package com.hospital.hospitalservice.controller;
 
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,8 @@ import lombok.RequiredArgsConstructor;
 @CrossOrigin(origins = "*")
 public class HospitalController {
 	private final HospitalService hospitalService;
+	@Value("${server.port}")
+	private String port;
 	
 	@PostMapping
 	public ResponseEntity<ApiResponseDTO<HospitalResponseDTO>> createHospital(
@@ -48,6 +51,7 @@ public class HospitalController {
 	 //             to check that a hospitalId really exists before saving a doctor or an appointment.
 	 @GetMapping("/{id}")
 	    public ResponseEntity<ApiResponseDTO<HospitalResponseDTO>> getHospitalById(@PathVariable Long id) {
+		 System.out.println(">>> HOSPITAL-SERVICE handled request on PORT " + port); 
 		 HospitalResponseDTO hospital = hospitalService.getHospitalById(id);
 	        return ResponseEntity.ok(ApiResponseDTO.success(hospital));
 	   }
