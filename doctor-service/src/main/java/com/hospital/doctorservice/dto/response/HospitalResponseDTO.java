@@ -1,4 +1,4 @@
-package com.hospital.appointmentservice.client;
+package com.hospital.doctorservice.dto.response;
 
 import java.time.LocalTime;
 

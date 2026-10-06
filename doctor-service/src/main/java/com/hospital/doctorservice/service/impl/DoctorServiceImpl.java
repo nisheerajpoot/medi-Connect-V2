@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.hospital.doctorservice.client.HospitalClient;
 import com.hospital.doctorservice.dto.request.DoctorRequestDTO;
 import com.hospital.doctorservice.dto.request.UpdateDoctorRequestDTO;
 import com.hospital.doctorservice.dto.response.DoctorResponseDTO;
@@ -15,6 +16,7 @@ import com.hospital.doctorservice.exception.ResourceNotFoundException;
 import com.hospital.doctorservice.repository.DoctorRepository;
 import com.hospital.doctorservice.service.DoctorService;
 
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -23,6 +25,15 @@ import lombok.RequiredArgsConstructor;
 public class DoctorServiceImpl implements DoctorService {
 
 	public final DoctorRepository doctorRepository;
+	public final HospitalClient hospitalClient;
+	
+	private void checkHospitalExists(Long hospitalId) {
+	    try {
+	        hospitalClient.getHospitalById(hospitalId);
+	    } catch (FeignException.NotFound e) {
+	        throw new ResourceNotFoundException("Hospital", "id", hospitalId);
+	    }
+	}
 
 	@Override
 	public DoctorResponseDTO createDoctor(DoctorRequestDTO requestDTO) {
@@ -30,8 +41,7 @@ public class DoctorServiceImpl implements DoctorService {
 			throw new DuplicateResourceException("Doctor", "phoneNumber", requestDTO.getPhoneNumber());
 		}
 
-		// [MS-CHANGE / TODO Phase 2] hospitalId is NOT validated yet (the monolith checked the hospital table).
-		//             Later we will call hospital-service (Feign) to confirm that the hospital exists.
+		checkHospitalExists(requestDTO.getHospitalId());
 		Doctor doctor = Doctor.builder()
 				.name(requestDTO.getName())
 				.specialization(requestDTO.getSpecialization())
@@ -57,7 +67,14 @@ public class DoctorServiceImpl implements DoctorService {
 				requestDTO.getHospitalId() == null) {
 			throw new IllegalArgumentException("At least one field must be provided for update");
 		}
-
+		
+		
+		if(requestDTO.getHospitalId()!=null) {
+			 // [MS-CHANGE / DONE Phase 2] New hospital is validated through hospital-service (Feign).
+		    checkHospitalExists(requestDTO.getHospitalId());
+		    doctor.setHospitalId(requestDTO.getHospitalId());
+		}
+		
 		if (requestDTO.getName() != null) {
 			if (requestDTO.getName().isBlank()) {
 				throw new IllegalArgumentException("Name cannot be blank");

@@ -5,8 +5,10 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.hospital.appointmentservice.client.HospitalClient;
 import com.hospital.appointmentservice.dto.request.UpdateAppointmentStatusRequestDTO;
 import com.hospital.appointmentservice.dto.response.AppointmentResponseDTO;
+import com.hospital.appointmentservice.dto.response.HospitalResponseDTO;
 import com.hospital.appointmentservice.dto.response.ReceptionDashboardResponseDTO;
 import com.hospital.appointmentservice.entity.Appointment;
 import com.hospital.appointmentservice.entity.AppointmentStatus;
@@ -15,6 +17,7 @@ import com.hospital.appointmentservice.exception.ResourceNotFoundException;
 import com.hospital.appointmentservice.repository.AppointmentRepository;
 import com.hospital.appointmentservice.service.ReceptionService;
 
+import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -26,16 +29,35 @@ public class ReceptionServiceImpl implements ReceptionService {
 	// [MS-CHANGE] HospitalRepository is removed. Hospital data lives in hospital-service.
 	private final AppointmentRepository appointmentRepository;
 
+	// [MS-CHANGE / DONE Phase 2] Hospital details (name, opening and closing time) now come
+	//             from hospital-service through Feign.
+	private final HospitalClient hospitalClient;
+
+	// ---------- helper method (Feign call) ----------
+
+	private HospitalResponseDTO getHospitalOrThrow(Long hospitalId) {
+		try {
+			return hospitalClient.getHospitalById(hospitalId).getData();
+		} catch (FeignException.NotFound e) {
+			throw new ResourceNotFoundException("Hospital", "id", hospitalId);
+		}
+	}
+
+	// ---------- service methods ----------
+
 	@Override
 	public ReceptionDashboardResponseDTO getDashboard(Long hospitalId) {
-		// [MS-CHANGE / TODO Phase 2] The monolith checked that the hospital exists and returned its name.
-		//             Now hospitalName stays null. Later: get the hospital from hospital-service (Feign).
+		// [MS-CHANGE / DONE Phase 2] The hospital is checked (and its name is fetched)
+		//             through hospital-service using Feign.
+		HospitalResponseDTO hospital = getHospitalOrThrow(hospitalId);
+
 		long pending = appointmentRepository.findByHospitalIdAndStatus(hospitalId, AppointmentStatus.PENDING).size();
 		long confirmed = appointmentRepository.findByHospitalIdAndStatus(hospitalId, AppointmentStatus.CONFIRMED).size();
 		long rejected = appointmentRepository.findByHospitalIdAndStatus(hospitalId, AppointmentStatus.REJECTED).size();
 
 		return ReceptionDashboardResponseDTO.builder()
 				.hospitalId(hospitalId)
+				.hospitalName(hospital.getName())
 				.pendingCount(pending)
 				.confirmedCount(confirmed)
 				.rejectedCount(rejected)
@@ -91,10 +113,15 @@ public class ReceptionServiceImpl implements ReceptionService {
 				throw new IllegalArgumentException("Start time must be before end time");
 			}
 
-			// [MS-CHANGE / TODO Phase 2] The monolith checked that the slot is inside the hospital's
-			//             opening and closing hours. Those timings live in hospital-service, so this check
-			//             is removed for now. Later: fetch the hospital from hospital-service (Feign) and
-			//             bring the check back.
+			// [MS-CHANGE / DONE Phase 2] The slot must be inside the hospital's opening and closing hours.
+			//             The timings come from hospital-service (Feign).
+			HospitalResponseDTO hospital = getHospitalOrThrow(appointment.getHospitalId());
+
+			if (requestDTO.getStartTime().isBefore(hospital.getOpeningTime())
+					|| requestDTO.getEndTime().isAfter(hospital.getClosingTime())) {
+				throw new InvalidOperationException("Appointment time must be within hospital hours ("
+						+ hospital.getOpeningTime() + " - " + hospital.getClosingTime() + ")");
+			}
 
 			// Doctor overlap check still works: the data is in this service (doctorId is a plain field now).
 			List<Appointment> doctorAppointments = appointmentRepository

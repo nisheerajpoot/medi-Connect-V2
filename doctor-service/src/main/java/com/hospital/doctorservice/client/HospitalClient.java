@@ -1,11 +1,11 @@
-package com.hospital.appointmentservice.client;
+package com.hospital.doctorservice.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import com.hospital.appointmentservice.dto.response.ApiResponseDTO;
-import com.hospital.appointmentservice.dto.response.HospitalResponseDTO;
+import com.hospital.doctorservice.dto.response.ApiResponseDTO;
+import com.hospital.doctorservice.dto.response.HospitalResponseDTO;
 
 @FeignClient(name = "hospital-service")
 public interface HospitalClient {
