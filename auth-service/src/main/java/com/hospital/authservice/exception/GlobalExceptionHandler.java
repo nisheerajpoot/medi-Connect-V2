@@ -1,4 +1,4 @@
-package com.hospital.appointmentservice.exception;
+package com.hospital.authservice.exception;
 
 
 import java.time.LocalDateTime;
@@ -7,7 +7,6 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,9 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -123,33 +120,30 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleGlobalException(
-	        Exception ex, HttpServletRequest request) {
+			Exception ex, HttpServletRequest request) {
 
-		log.error("Unexpected error on {}", request.getRequestURI(), ex); // <-- ye nayi line
+		ErrorResponse errorResponse = ErrorResponse.builder()
+				.timeStamp(LocalDateTime.now())
+				.status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+				.error("Internal Server Error")
+				.message("An unexpected error occurred. Please try again later.")
+				.path(request.getRequestURI())
+				.build();
 
-	    ErrorResponse errorResponse = ErrorResponse.builder()
-	            .timeStamp(LocalDateTime.now())
-	            .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-	            .error("Internal Server Error")
-	            .message("DEBUG-V2: " + ex.getClass().getName() + " : " + ex.getMessage())
-	            .path(request.getRequestURI())
-	            .build();
-
-	    return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+		return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 	
-	@ExceptionHandler(HttpMessageNotReadableException.class)
-	public ResponseEntity<ErrorResponse> handleUnreadableBody(
-	        HttpMessageNotReadableException ex, HttpServletRequest request) {
-
+	
+	@ExceptionHandler(UnauthorizedException.class)
+	public ResponseEntity<ErrorResponse> handleUnauthorizedException(
+	        UnauthorizedException ex, HttpServletRequest request) {
 	    ErrorResponse errorResponse = ErrorResponse.builder()
 	            .timeStamp(LocalDateTime.now())
-	            .status(HttpStatus.BAD_REQUEST.value())
-	            .error("Bad Request")
-	            .message("Request body is missing or is not valid JSON")
+	            .status(HttpStatus.UNAUTHORIZED.value())
+	            .error("Unauthorized")
+	            .message(ex.getMessage())
 	            .path(request.getRequestURI())
 	            .build();
-
-	    return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+	    return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
 	}
 }
